@@ -4,7 +4,7 @@ Web app para gestionar la liga de Warhammer 40.000 del servidor de Discord: temp
 
 ## Hoja de ruta
 
-1. **Base** (hecho): login con Discord, roles de admin y jugador, tablas de Supabase y calendario de la temporada configurable por el admin.
+1. **Base** (hecho): login con email (Discord opcional), roles de admin y jugador, tablas de Supabase y calendario de la temporada configurable por el admin.
 2. **Inscripción y listas**: inscribirse y subir la lista (importada de War Army o pegada como texto), validada con el motor de War Army.
 3. **Liga automática**: pairings suizos, reporte y confirmación de resultados, doble derrota al pasar el plazo, eliminatorias y avisos en Discord.
 4. **Estadísticas**: clasificación, rachas, filtros por ejército y destacamento.
@@ -17,17 +17,21 @@ Web app para gestionar la liga de Warhammer 40.000 del servidor de Discord: temp
 La liga usa el proyecto de Supabase de War Army, pero todas sus tablas y funciones van en el esquema **`league`**. No toca las tablas de War Army (`public.items`, fotos) ni añade triggers a `auth.users`. Las cuentas que solo usan War Army no tienen perfil en la liga.
 
 1. En **SQL Editor > New query** pega todo el contenido de [`supabase/schema.sql`](supabase/schema.sql) y pulsa **Run**. Se puede volver a ejecutar sin perder datos.
-2. En **Project Settings > Data API > Exposed schemas** añade `league` (deja `public` también, que lo usa War Army) y guarda.
+2. En el menú de la izquierda, **Integrations > Data API > Settings > Exposed schemas**: añade `league` (deja `public`, que lo usa War Army) y guarda.
 
-La **primera cuenta que entra con Discord queda como administrador**, así que entra tú primero. Desde Admin > Jugadores se puede dar el rol de admin a otros.
+La **primera cuenta que entra en la app queda como administrador**, así que entra tú primero. Desde Admin > Jugadores se puede dar el rol de admin a otros.
 
-### 2. Login con Discord
+### 2. Login
 
-1. En el [Discord Developer Portal](https://discord.com/developers/applications) crea una aplicación y, en **OAuth2**, copia el **Client ID** y el **Client Secret**.
-2. En **OAuth2 > Redirects** añade `https://brolnjqnudabskzdwunk.supabase.co/auth/v1/callback`.
-3. En Supabase, **Authentication > Sign In / Providers > Discord**: actívalo y pega el Client ID y el Client Secret. El login con email de War Army sigue igual.
-4. En Supabase, **Authentication > URL Configuration**: **deja el *Site URL* de War Army como está** y añade en *Redirect URLs* `https://iostick.github.io/super-slam-wagh/**` y `http://localhost:5173/**`. La app pide volver a su propia dirección al entrar, así que con estar en la lista basta.
-5. Opcional: para comprobar que cada jugador está en el servidor de la liga, activa el modo desarrollador de Discord, haz clic derecho en el servidor > **Copiar ID** y ponlo en `VITE_DISCORD_GUILD_ID` dentro de `.env`.
+Se entra con **email y contraseña**, igual que en War Army (es la misma cuenta: quien ya usa War Army entra con sus datos, pero los datos de la liga van aparte).
+
+En Supabase, **Authentication > URL Configuration**: **deja el *Site URL* de War Army como está** y añade en *Redirect URLs* `https://iostick.github.io/super-slam-wagh/**` (y `http://localhost:5173/**` para probar en local). Hace falta para que los correos de confirmar cuenta y de recuperar contraseña vuelvan a la liga.
+
+**Discord (opcional, más adelante)**: el código ya lo soporta. Para activarlo:
+
+1. En el [Discord Developer Portal](https://discord.com/developers/applications) crea una aplicación y, en **OAuth2**, copia el **Client ID** y el **Client Secret**. En **OAuth2 > Redirects** añade `https://brolnjqnudabskzdwunk.supabase.co/auth/v1/callback`.
+2. En Supabase, **Authentication > Sign In / Providers > Discord**: actívalo y pega el Client ID y el Client Secret.
+3. En `.env` pon `VITE_DISCORD_LOGIN=true`. Opcional: `VITE_DISCORD_GUILD_ID` con el id del servidor para comprobar que cada jugador está en él.
 
 ### 3. Variables
 

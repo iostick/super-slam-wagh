@@ -13,3 +13,5 @@ export const supabase = createClient(url || 'https://placeholder.supabase.co', k
 })
 
 export const discordGuildId = import.meta.env.VITE_DISCORD_GUILD_ID || ''
+/** El botón "Entrar con Discord" solo aparece si VITE_DISCORD_LOGIN=true (hay que activar Discord en Supabase) */
+export const discordLogin = import.meta.env.VITE_DISCORD_LOGIN === 'true'

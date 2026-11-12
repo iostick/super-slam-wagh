@@ -12,7 +12,7 @@ import ProfileScreen from './screens/ProfileScreen'
 import SetupScreen from './screens/SetupScreen'
 
 export default function App() {
-  const { loading, session, isAdmin } = useAuth()
+  const { loading, session, isAdmin, recovery } = useAuth()
 
   if (!isConfigured) return <SetupScreen />
   if (loading)
@@ -22,6 +22,14 @@ export default function App() {
       </Box>
     )
   if (!session) return <LoginScreen />
+
+  // Al abrir el enlace de "olvidé mi contraseña" se va directo a elegir una nueva
+  if (recovery)
+    return (
+      <Layout>
+        <ProfileScreen />
+      </Layout>
+    )
 
   return (
     <Layout>

@@ -1,7 +1,7 @@
 -- Super Slam Wagh: tablas, permisos y funciones de la liga.
 -- Todo vive en el esquema "league", separado de las tablas de War Army (public),
 -- así que se puede instalar en el mismo proyecto de Supabase sin mezclar nada.
--- No añade triggers a auth.users: el perfil de la liga se crea al entrar con Discord.
+-- No añade triggers a auth.users: el perfil de la liga se crea la primera vez que alguien entra en la app.
 -- Pégalo entero en Supabase > SQL Editor > New query y pulsa Run.
 -- Se puede volver a ejecutar sin perder datos.
 
@@ -25,7 +25,7 @@ do $$ begin
   create type league.match_status as enum ('pending', 'reported', 'confirmed', 'double_loss', 'bye');
 exception when duplicate_object then null; end $$;
 
--- ---------- Perfiles (uno por cuenta de Discord) ----------
+-- ---------- Perfiles (uno por cuenta que entra en la liga) ----------
 create table if not exists league.profiles (
   id uuid primary key references auth.users on delete cascade,
   discord_id text unique,
@@ -37,29 +37,38 @@ create table if not exists league.profiles (
   created_at timestamptz not null default now()
 );
 
--- La app la llama al iniciar sesión: crea el perfil de la liga con el nombre y el avatar de Discord
--- (o actualiza el avatar). Solo para cuentas con Discord, así que las cuentas de War Army
--- que no entran en la liga no tienen perfil aquí. La primera cuenta que entra queda como administrador.
+-- La app la llama al iniciar sesión: crea el perfil de la liga la primera vez (con el nombre
+-- que se puso al crear la cuenta, o el de Discord si entra con Discord) y actualiza el avatar.
+-- Las cuentas de War Army que nunca abren la liga no tienen perfil aquí.
+-- La primera cuenta que entra queda como administrador.
 create or replace function league.ensure_profile() returns void
 language plpgsql security definer set search_path = league, public as $$
 declare
+  u auth.users;
+  discord jsonb;
   meta jsonb;
 begin
-  select i.identity_data into meta from auth.identities i
-    where i.user_id = auth.uid() and i.provider = 'discord'
+  select * into u from auth.users where id = auth.uid();
+  if u.id is null then raise exception 'Inicia sesión para unirte a la liga'; end if;
+  meta := coalesce(u.raw_user_meta_data, '{}'::jsonb);
+  select i.identity_data into discord from auth.identities i
+    where i.user_id = u.id and i.provider = 'discord'
     order by i.created_at desc limit 1;
-  if meta is null then raise exception 'Entra con tu cuenta de Discord para unirte a la liga'; end if;
 
   insert into league.profiles (id, discord_id, username, display_name, avatar_url, role)
   values (
-    auth.uid(),
-    coalesce(meta->>'provider_id', meta->>'sub'),
-    meta->>'name',
-    coalesce(meta->'custom_claims'->>'global_name', meta->>'full_name', meta->>'name', 'Jugador'),
-    meta->>'avatar_url',
+    u.id,
+    coalesce(discord->>'provider_id', discord->>'sub'),
+    discord->>'name',
+    coalesce(nullif(trim(meta->>'display_name'), ''), discord->'custom_claims'->>'global_name', discord->>'full_name',
+      discord->>'name', split_part(u.email, '@', 1), 'Jugador'),
+    discord->>'avatar_url',
     case when exists (select 1 from league.profiles) then 'player'::league.user_role else 'admin'::league.user_role end
   )
-  on conflict (id) do update set username = excluded.username, avatar_url = excluded.avatar_url;
+  on conflict (id) do update set
+    discord_id = coalesce(excluded.discord_id, league.profiles.discord_id),
+    username = coalesce(excluded.username, league.profiles.username),
+    avatar_url = coalesce(excluded.avatar_url, league.profiles.avatar_url);
 end $$;
 
 create or replace function league.is_admin() returns boolean

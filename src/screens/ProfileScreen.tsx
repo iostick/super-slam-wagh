@@ -4,13 +4,43 @@ import { useAuth } from '../lib/auth'
 import { discordGuildId, supabase } from '../lib/supabase'
 
 export default function ProfileScreen() {
-  const { profile, profileError, signOut, reloadProfile } = useAuth()
+  const { profile, profileError, signOut, reloadProfile, recovery, clearRecovery } = useAuth()
+  const [password, setPassword] = useState('')
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string }>()
+
+  async function changePassword() {
+    const { error } = await supabase.auth.updateUser({ password })
+    setPwMsg(error ? { ok: false, text: error.message } : { ok: true, text: 'Contraseña cambiada' })
+    if (!error) {
+      setPassword('')
+      clearRecovery()
+    }
+  }
+
+  const passwordCard = (
+    <Card>
+      <CardContent>
+        <Stack spacing={2}>
+          <Typography variant="h6">Contraseña</Typography>
+          {recovery && <Alert severity="info">Elige tu contraseña nueva.</Alert>}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <TextField label="Nueva contraseña" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth size="small" autoFocus={recovery} />
+            <Button variant="contained" onClick={changePassword} disabled={password.length < 6}>
+              Cambiar
+            </Button>
+          </Stack>
+          {pwMsg && <Alert severity={pwMsg.ok ? 'success' : 'error'}>{pwMsg.text}</Alert>}
+        </Stack>
+      </CardContent>
+    </Card>
+  )
   const [name, setName] = useState(profile?.display_name ?? '')
   const [msg, setMsg] = useState<{ ok: boolean; text: string }>()
   if (!profile)
     return (
       <Stack spacing={2}>
         <Alert severity="warning">{profileError ?? 'No se encontró tu perfil. Prueba a cerrar sesión y volver a entrar.'}</Alert>
+        {recovery && passwordCard}
         <Button color="inherit" variant="outlined" onClick={signOut} sx={{ alignSelf: 'flex-start' }}>
           Cerrar sesión
         </Button>
@@ -33,7 +63,7 @@ export default function ProfileScreen() {
               <Avatar src={profile.avatar_url ?? undefined} sx={{ width: 64, height: 64 }} />
               <Stack>
                 <Typography variant="h6">{profile.display_name}</Typography>
-                <Typography color="text.secondary">@{profile.username}</Typography>
+                {profile.username && <Typography color="text.secondary">@{profile.username}</Typography>}
               </Stack>
             </Stack>
             <Stack direction="row" spacing={1}>
@@ -53,6 +83,7 @@ export default function ProfileScreen() {
           </Stack>
         </CardContent>
       </Card>
+      {passwordCard}
     </Stack>
   )
 }

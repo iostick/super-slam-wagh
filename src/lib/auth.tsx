@@ -10,12 +10,19 @@ interface AuthState {
   /** Error al crear el perfil de la liga (por ejemplo, si el esquema no está expuesto) */
   profileError?: string
   isAdmin: boolean
-  signIn: () => Promise<void>
+  /** true al abrir el enlace de "olvidé mi contraseña": hay que pedir una nueva */
+  recovery: boolean
+  clearRecovery: () => void
+  signInWithPassword: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, name: string) => Promise<string>
+  resetPassword: (email: string) => Promise<void>
+  signInWithDiscord: () => Promise<void>
   signOut: () => Promise<void>
   reloadProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
+const here = () => window.location.origin + window.location.pathname
 
 /** Comprueba con el token de Discord (solo disponible justo después del login) si el jugador está en el servidor. */
 async function checkGuild(session: Session) {
@@ -37,13 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [profileError, setProfileError] = useState<string>()
+  const [recovery, setRecovery] = useState(false)
 
   const loadProfile = useCallback(async (s: Session | null) => {
     if (!s) {
       setProfile(null)
+      setProfileError(undefined)
       return
     }
-    // Crea el perfil de la liga la primera vez (y actualiza el avatar de Discord)
+    // Crea el perfil de la liga la primera vez (y actualiza el avatar)
     const { error: ensureError } = await supabase.rpc('ensure_profile')
     setProfileError(ensureError?.message)
     const { data } = await supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
@@ -59,22 +68,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true)
       // Esperar fuera del callback: Supabase desaconseja llamadas await dentro de él
       setTimeout(async () => {
         if (event === 'SIGNED_IN' && s) await checkGuild(s)
-        await loadProfile(s)
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') await loadProfile(s)
       }, 0)
     })
     return () => sub.subscription.unsubscribe()
   }, [loadProfile])
 
-  const signIn = useCallback(async () => {
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+  }, [])
+
+  const signUp = useCallback(async (email: string, password: string, name: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: here(), data: { display_name: name } },
+    })
+    if (error) throw error
+    return data.session ? '' : 'Te hemos enviado un correo para confirmar la cuenta. Ábrelo y vuelve aquí.'
+  }, [])
+
+  const resetPassword = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: here() })
+    if (error) throw error
+  }, [])
+
+  const signInWithDiscord = useCallback(async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'discord',
-      options: {
-        redirectTo: window.location.origin + window.location.pathname,
-        scopes: discordGuildId ? 'identify email guilds' : 'identify email',
-      },
+      options: { redirectTo: here(), scopes: discordGuildId ? 'identify email guilds' : 'identify email' },
     })
   }, [])
 
@@ -86,7 +113,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ loading, session, profile, profileError, isAdmin: profile?.role === 'admin', signIn, signOut, reloadProfile }}
+      value={{
+        loading,
+        session,
+        profile,
+        profileError,
+        isAdmin: profile?.role === 'admin',
+        recovery,
+        clearRecovery: () => setRecovery(false),
+        signInWithPassword,
+        signUp,
+        resetPassword,
+        signInWithDiscord,
+        signOut,
+        reloadProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>
