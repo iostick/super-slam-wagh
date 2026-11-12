@@ -7,6 +7,8 @@ interface AuthState {
   loading: boolean
   session: Session | null
   profile: Profile | null
+  /** Error al crear el perfil de la liga (por ejemplo, si el esquema no está expuesto) */
+  profileError?: string
   isAdmin: boolean
   signIn: () => Promise<void>
   signOut: () => Promise<void>
@@ -34,12 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(isConfigured)
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [profileError, setProfileError] = useState<string>()
 
   const loadProfile = useCallback(async (s: Session | null) => {
     if (!s) {
       setProfile(null)
       return
     }
+    // Crea el perfil de la liga la primera vez (y actualiza el avatar de Discord)
+    const { error: ensureError } = await supabase.rpc('ensure_profile')
+    setProfileError(ensureError?.message)
     const { data } = await supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
     setProfile(data as Profile | null)
   }, [])
@@ -80,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ loading, session, profile, isAdmin: profile?.role === 'admin', signIn, signOut, reloadProfile }}
+      value={{ loading, session, profile, profileError, isAdmin: profile?.role === 'admin', signIn, signOut, reloadProfile }}
     >
       {children}
     </AuthContext.Provider>

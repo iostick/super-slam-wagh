@@ -4,10 +4,18 @@ import { useAuth } from '../lib/auth'
 import { discordGuildId, supabase } from '../lib/supabase'
 
 export default function ProfileScreen() {
-  const { profile, signOut, reloadProfile } = useAuth()
+  const { profile, profileError, signOut, reloadProfile } = useAuth()
   const [name, setName] = useState(profile?.display_name ?? '')
   const [msg, setMsg] = useState<{ ok: boolean; text: string }>()
-  if (!profile) return <Alert severity="warning">No se encontró tu perfil. Prueba a cerrar sesión y volver a entrar.</Alert>
+  if (!profile)
+    return (
+      <Stack spacing={2}>
+        <Alert severity="warning">{profileError ?? 'No se encontró tu perfil. Prueba a cerrar sesión y volver a entrar.'}</Alert>
+        <Button color="inherit" variant="outlined" onClick={signOut} sx={{ alignSelf: 'flex-start' }}>
+          Cerrar sesión
+        </Button>
+      </Stack>
+    )
 
   async function save() {
     const { error } = await supabase.from('profiles').update({ display_name: name.trim() }).eq('id', profile!.id)

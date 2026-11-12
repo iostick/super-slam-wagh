@@ -35,7 +35,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 }
 
 export default function HomeScreen() {
-  const { profile } = useAuth()
+  const { profile, profileError } = useAuth()
   const { season, rounds, players, loading, error } = useCurrentSeason()
   const now = useNow()
   const today = toIso(now)
@@ -47,10 +47,11 @@ export default function HomeScreen() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h4">Hola, {profile?.display_name}</Typography>
+      <Typography variant="h4">Hola{profile ? `, ${profile.display_name}` : ''}</Typography>
       {discordGuildId && profile && !profile.guild_member && (
         <Alert severity="warning">No te encontramos en el servidor de Discord de la liga. Únete al servidor y vuelve a entrar.</Alert>
       )}
+      {profileError && !profile && <Alert severity="error">No se pudo crear tu perfil de la liga: {profileError}</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
       {!season && !error && <Alert severity="info">Todavía no hay ninguna temporada publicada. El administrador la abrirá pronto.</Alert>}
       {season && (

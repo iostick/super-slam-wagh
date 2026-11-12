@@ -7,6 +7,8 @@ const key = import.meta.env.VITE_SUPABASE_KEY
 export const isConfigured = Boolean(url && key)
 
 export const supabase = createClient(url || 'https://placeholder.supabase.co', key || 'placeholder', {
+  // La liga usa su propio esquema (league) dentro del proyecto de Supabase de War Army
+  db: { schema: 'league' },
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'slam-wagh-auth' },
 })
 
