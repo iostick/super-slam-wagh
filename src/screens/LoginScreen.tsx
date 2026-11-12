@@ -17,6 +17,7 @@ const ERRORS: Record<string, string> = {
   'Invalid login credentials': 'Email o contraseña incorrectos',
   'Email not confirmed': 'Todavía no has confirmado tu email: revisa tu correo',
   'User already registered': 'Ya existe una cuenta con ese email. Entra con tu contraseña.',
+  'email rate limit exceeded': 'Se han enviado demasiados correos. Espera una hora y vuelve a intentarlo.',
 }
 
 export default function LoginScreen() {
